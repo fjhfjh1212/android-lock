@@ -1,0 +1,7 @@
+{
+  "rewrites": [
+    { "source": "/state", "destination": "/api/lock?action=state" },
+    { "source": "/take", "destination": "/api/lock?action=take" },
+    { "source": "/release", "destination": "/api/lock?action=release" }
+  ]
+}
