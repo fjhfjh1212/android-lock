@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>接管锁 · android-phone</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;margin:0;padding:20px;background:#f6f6f6;color:#111}
+.card{max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+h1{font-size:22px;margin:0 0 8px}
+.status{font-size:28px;font-weight:800;margin:16px 0 4px}
+.status.locked{color:#c81e1e}
+.status.free{color:#067647}
+.sub{color:#555;font-size:15px;line-height:1.6}
+button{display:block;width:100%;font-size:22px;font-weight:700;padding:20px 12px;margin-top:16px;border:0;border-radius:14px;cursor:pointer}
+#take{background:#c81e1e;color:#fff}
+#release{background:#067647;color:#fff}
+#refresh{background:#e5e7eb;color:#111;font-size:17px;padding:12px}
+button:disabled{opacity:.45}
+.note{font-size:13px;color:#666;line-height:1.7;margin-top:18px;border-top:1px solid #eee;padding-top:12px}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:13px;word-break:break-all}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>android-phone 接管锁</h1>
+<div id="state" class="status free">加载中…</div>
+<div id="detail" class="sub"></div>
+<button id="take">接管控制</button>
+<button id="release">交还 Muse</button>
+<button id="refresh">刷新状态</button>
+<div class="note">
+<b>接管 30 分钟自动过期。</b>过期后锁自动释放，控制权回到 Muse。<br>
+<b>Muse 查锁规则（每次操作 Android 前必须执行）：</b>先 GET /state 查锁；若请求失败、超时或返回错误，一律视为已锁定，拒绝一切输入操作、只允许只读查看；若 locked 为 true，拒绝一切输入操作、只允许只读查看；只有 locked 为 false 时才允许操作。<br>
+接口：GET /state · POST /take · POST /release
+<div id="raw" class="mono"></div>
+</div>
+</div>
+<script>
+var stateEl = document.getElementById('state');
+var detailEl = document.getElementById('detail');
+var rawEl = document.getElementById('raw');
+var takeBtn = document.getElementById('take');
+var releaseBtn = document.getElementById('release');
+function fmt(ts){ if(!ts) return '—'; var d = new Date(ts); return d.toLocaleString('zh-CN'); }
+function render(s){
+  rawEl.textContent = JSON.stringify(s);
+  if (s && s.locked) {
+    stateEl.textContent = '用户接管中';
+    stateEl.className = 'status locked';
+    var left = s.expiresAt ? Math.max(0, Math.round((s.expiresAt - Date.now()) / 60000)) : 0;
+    detailEl.textContent = '接管开始：' + fmt(s.lockedAt) + ' ｜ 自动过期：' + fmt(s.expiresAt) + ' ｜ 约 ' + left + ' 分钟后自动释放';
+    takeBtn.disabled = true; releaseBtn.disabled = false;
+  } else {
+    stateEl.textContent = 'Muse 控制中';
+    stateEl.className = 'status free';
+    detailEl.textContent = (s && s.expired) ? '上次接管已超时过期，控制权已自动交还 Muse。' : '当前无人接管，Muse 可以正常操作。';
+    takeBtn.disabled = false; releaseBtn.disabled = true;
+  }
+}
+function load(){
+  stateEl.textContent = '加载中…';
+  fetch('/state').then(function(r){ return r.json(); }).then(render).catch(function(){
+    stateEl.textContent = '锁服务异常（视为已锁定）';
+    stateEl.className = 'status locked';
+    detailEl.textContent = '查不到锁状态时默认拒绝一切输入操作，只允许只读查看。';
+  });
+}
+function post(path){
+  fetch(path, { method: 'POST' }).then(function(r){ return r.json(); }).then(function(){ load(); }).catch(load);
+}
+takeBtn.addEventListener('click', function(){ post('/take'); });
+releaseBtn.addEventListener('click', function(){ post('/release'); });
+document.getElementById('refresh').addEventListener('click', load);
+load();
+setInterval(load, 10000);
+</script>
+</body>
+</html>
